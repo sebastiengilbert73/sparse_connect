@@ -1,5 +1,6 @@
 import numpy as np
 import random
+import logging
 
 class Node:
     def __init__(self, number_of_nodes=0, connectivity_average=0, connectivity_std_dev=0, prob_arr=None):
@@ -44,6 +45,17 @@ class Node:
         row_sum = self.prob_arr[row_ndx, :].sum()
         self.prob_arr[row_ndx, :] = self.prob_arr[row_ndx, :]/row_sum
 
+    def add_to_prob(self, target_node, routed_node, delta):
+        self.prob_arr[target_node, routed_node] = np.clip(self.prob_arr[target_node, routed_node] + delta, 0, 1)
+        self.normalize_row(target_node)
+
+    def collapse(self):  # Set the probability to 1 for the highest probability, for each target node
+        max_ndx = self.prob_arr.argmax(axis=1)  # (N_nodes)
+        one_hot = np.zeros_like(self.prob_arr)  # (N_nodes, N_nodes)
+        one_hot[np.arange(self.prob_arr.shape[0]), max_ndx] = 1
+        self.prob_arr = one_hot
+
+
 
 def roulette(index_prob_list):
     running_sum = 0
@@ -80,3 +92,32 @@ class Network:
             if current_node == target_node:
                 return visited_nodes, attenuations
         return visited_nodes, attenuations
+
+    def update_probabilities(self, visited_nodes, attenuations, target_node):
+        deserve_reward = True
+        if len(visited_nodes) >= self.maximum_hops and visited_nodes[-1] != target_node:
+            deserve_reward = False
+        logging.debug(f"Network.update_probabilities(): deserve_reward = {deserve_reward}")
+        probs = []
+        for origin_ndx in range(len(visited_nodes) - 1):
+            origin_node = visited_nodes[origin_ndx]
+            dest_node = visited_nodes[origin_ndx + 1]
+            probs.append( float(self.nodes[origin_node].prob_arr[target_node, dest_node]))
+        logging.debug(f"Network.update_probabilities(): probs = {probs}")
+        for origin_ndx in range(len(visited_nodes) - 1):
+            origin_node = visited_nodes[origin_ndx]
+            routed_node = visited_nodes[origin_ndx + 1]
+            logging.debug(f"Network.update_probabilities(): origin_ndx = {origin_ndx}; origin_node = {origin_node}; routed_node = {routed_node}")
+            reward = 1.0
+            for hop_ndx in range(origin_ndx, len(visited_nodes) - 1):
+                reward *= probs[hop_ndx] * attenuations[hop_ndx]
+                logging.debug(f"Network.update_probabilities(): probs[hop_ndx] = {probs[hop_ndx]}; attenuations[hop_ndx] = {attenuations[hop_ndx]}")
+            logging.debug(f"Network.update_probabilities(): reward = {reward}")
+            if deserve_reward:
+                self.nodes[origin_node].add_to_prob(target_node, routed_node, reward)
+            else:
+                self.nodes[origin_node].add_to_prob(target_node, routed_node, -self.maximum_hops_penalty)
+
+    def collapse(self):  # Collapse each node, into a one-hot vector (winner takes all on probabilities)
+        for node in self.nodes:
+            node.collapse()
