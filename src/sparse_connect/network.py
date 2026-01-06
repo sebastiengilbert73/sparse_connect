@@ -92,7 +92,7 @@ class Network:
                 return visited_nodes, gains
         return visited_nodes, gains
 
-    def update_probabilities(self, visited_nodes, gains, target_node):
+    def update_probabilities(self, visited_nodes, gains, target_node, learning_rate=1.0):
         deserve_reward = True
         if len(visited_nodes) >= self.maximum_hops and visited_nodes[-1] != target_node:
             deserve_reward = False
@@ -107,7 +107,7 @@ class Network:
             origin_node = visited_nodes[origin_ndx]
             routed_node = visited_nodes[origin_ndx + 1]
             logging.debug(f"Network.update_probabilities(): origin_ndx = {origin_ndx}; origin_node = {origin_node}; routed_node = {routed_node}")
-            reward = 1.0
+            reward = learning_rate
             for hop_ndx in range(origin_ndx, len(visited_nodes) - 1):
                 reward *= probs[hop_ndx] * gains[hop_ndx]
                 logging.debug(f"Network.update_probabilities(): probs[hop_ndx] = {probs[hop_ndx]}; gains[hop_ndx] = {gains[hop_ndx]}")
