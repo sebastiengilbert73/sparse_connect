@@ -1,6 +1,7 @@
 import numpy as np
 import random
 import logging
+import math
 
 class Node:
     def __init__(self, number_of_nodes=0, connectivity_average=0, connectivity_std_dev=0, prob_arr=None):
@@ -16,13 +17,7 @@ class Node:
             connectivity = min(connectivity, self.number_of_nodes)  # Not more than N connections
             neighbors = random.sample(range(self.number_of_nodes), connectivity)  # [1, 4, 5, ...]
             prob = 1.0 / len(neighbors)  # Prior: Uniform distribution
-            #for target_node in range(self.number_of_nodes):
-            """connectivity = connectivity_average + connectivity_std_dev * np.random.randn()
-            connectivity = round(connectivity)
-            connectivity = max(connectivity, 2)  # At least two out-connections
-            neighbors = random.sample(range(self.number_of_nodes), connectivity)  # [1, 4, 5, ...]
-            prob = 1.0/len(neighbors)  # Prior: Uniform distribution
-            """
+
             for routed_node in neighbors:
                 self.prob_arr[:, routed_node] = prob
 
@@ -67,33 +62,37 @@ def roulette(index_prob_list):
     raise ValueError(f"roulette(): With index_prob_list = {index_prob_list}), we reached the end of the loop")
 
 class Network:
-    def __init__(self, number_of_nodes=10, connectivity_average=3, connectivity_std_dev=0, attenuation_range=[0.8, 1.0],
+    def __init__(self, number_of_nodes=10, connectivity_average=3, connectivity_std_dev=0, gain_range=[0.8, 1.0],
                  maximum_hops=100, maximum_hops_penalty=0.1):
         self.number_of_nodes = number_of_nodes
         self.connectivity_average = connectivity_average
         self.connectivity_std_dev = connectivity_std_dev
-        self.attenuation_range = attenuation_range
+        self.gain_range = gain_range
         self.maximum_hops = maximum_hops
         self.maximum_hops_penalty = maximum_hops_penalty
         self.nodes = []
         for node_ndx in range(self.number_of_nodes):
             self.nodes.append(Node(self.number_of_nodes, self.connectivity_average, self.connectivity_std_dev))
-        self.attenuation_arr = self.attenuation_range[0] + (self.attenuation_range[1] - self.attenuation_range[0]) * np.random.rand(self.number_of_nodes, self.number_of_nodes)
+        # Random gain: uniform an a log scale
+        min_log_gain = math.log(self.gain_range[0])
+        max_log_gain = math.log(self.gain_range[1])
+        log_gain_arr = min_log_gain + (max_log_gain - min_log_gain) * np.random.rand(self.number_of_nodes, self.number_of_nodes)
+        self.gain_arr = np.exp(log_gain_arr)
 
     def hops(self, starting_node, target_node):
         visited_nodes = [starting_node]
-        attenuations = []
+        gains = []
         current_node = starting_node
         while len(visited_nodes) < self.maximum_hops:
             routed_node = self.nodes[current_node].routing_node(target_node)
             visited_nodes.append(routed_node)
-            attenuations.append( float(self.attenuation_arr[current_node, routed_node]) )
+            gains.append( float(self.gain_arr[current_node, routed_node]) )
             current_node = routed_node
             if current_node == target_node:
-                return visited_nodes, attenuations
-        return visited_nodes, attenuations
+                return visited_nodes, gains
+        return visited_nodes, gains
 
-    def update_probabilities(self, visited_nodes, attenuations, target_node):
+    def update_probabilities(self, visited_nodes, gains, target_node):
         deserve_reward = True
         if len(visited_nodes) >= self.maximum_hops and visited_nodes[-1] != target_node:
             deserve_reward = False
@@ -110,8 +109,8 @@ class Network:
             logging.debug(f"Network.update_probabilities(): origin_ndx = {origin_ndx}; origin_node = {origin_node}; routed_node = {routed_node}")
             reward = 1.0
             for hop_ndx in range(origin_ndx, len(visited_nodes) - 1):
-                reward *= probs[hop_ndx] * attenuations[hop_ndx]
-                logging.debug(f"Network.update_probabilities(): probs[hop_ndx] = {probs[hop_ndx]}; attenuations[hop_ndx] = {attenuations[hop_ndx]}")
+                reward *= probs[hop_ndx] * gains[hop_ndx]
+                logging.debug(f"Network.update_probabilities(): probs[hop_ndx] = {probs[hop_ndx]}; gains[hop_ndx] = {gains[hop_ndx]}")
             logging.debug(f"Network.update_probabilities(): reward = {reward}")
             if deserve_reward:
                 self.nodes[origin_node].add_to_prob(target_node, routed_node, reward)
