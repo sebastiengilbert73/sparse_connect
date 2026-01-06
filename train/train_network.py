@@ -5,12 +5,14 @@ import random
 import numpy as np
 import math
 import os
+import pandas as pd
 #from dataclasses import asdict
 #import json
 import pickle
 import sys
 sys.path.append("..")
 import src.sparse_connect.network as network
+from utilities.scheduling import Schedule
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)-15s [%(levelname)s] %(message)s')
 
@@ -41,7 +43,8 @@ def main(
     maximumHopsPenalty,
     trainingSize,
     validationSize,
-    numberOfEpochs
+    #numberOfEpochs,
+    schedule
 ):
     logging.info(f"train_network.main()")
 
@@ -63,6 +66,10 @@ def main(
     # Validation dataset
     validation_list = create_dataset(numberOfNodes, validationSize)
 
+    # Load the schedule
+    schedule_df = pd.read_csv(schedule)
+    schedule = Schedule(schedule_df)
+
     with open(os.path.join(outputDirectory, 'epoch_training.csv'), 'w') as epoch_training_file:
         epoch_training_file.write("epoch,avg_length,std_length,avg_gain,std_gain\n")
         average_length, std_dev_length, average_total_gain, std_dev_total_gain = validation_stats(net, validation_list)
@@ -74,12 +81,13 @@ def main(
         average_total_gains = [average_total_gain]
         std_dev_total_gains = [std_dev_total_gain]
 
-
-        for epoch in range(1, numberOfEpochs + 1):
+        number_of_epochs = schedule.last_epoch()
+        for epoch in range(1, number_of_epochs + 1):
             logging.info(f"***** Epoch {epoch} *****")
             for start_node, target_node in training_list:
                 visited_nodes, gains = net.hops(start_node, target_node)
-                net.update_probabilities(visited_nodes, gains, target_node)
+                learning_rate = schedule.parameters(epoch)['learning_rate']
+                net.update_probabilities(visited_nodes, gains, target_node, learning_rate)
 
             # Validation
             average_length, std_dev_length, average_total_gain, std_dev_total_gain = validation_stats(net, validation_list)
@@ -113,7 +121,8 @@ if __name__ == '__main__':
     parser.add_argument('--maximumHopsPenalty', help="The penalty for reaching the maximum number of hops. Default: 0.1", type=float, default=0.1)
     parser.add_argument('--trainingSize', help="The number of training pairs. Default: 10000", type=int, default=10000)
     parser.add_argument('--validationSize', help="The number of validation pairs. Default: 2000", type=int, default=2000)
-    parser.add_argument('--numberOfEpochs', help="The number of epochs. Default: 50", type=int, default=50)
+    #parser.add_argument('--numberOfEpochs', help="The number of epochs. Default: 50", type=int, default=50)
+    parser.add_argument('--schedule', help="The filepath to the learning schedule. Default: './schedule.csv'", default='./schedule.csv')
     args = parser.parse_args()
     args.gainRange = ast.literal_eval(args.gainRange)
     main(
@@ -126,5 +135,6 @@ if __name__ == '__main__':
         args.maximumHopsPenalty,
         args.trainingSize,
         args.validationSize,
-        args.numberOfEpochs
+        #args.numberOfEpochs,
+        args.schedule
     )
