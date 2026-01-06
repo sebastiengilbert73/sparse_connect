@@ -120,3 +120,13 @@ class Network:
     def collapse(self):  # Collapse each node, into a one-hot vector (winner takes all on probabilities)
         for node in self.nodes:
             node.collapse()
+
+    def get_adjacency_matrix(self, target_node):
+        """
+        Returns an NxN matrix where matrix[i, j] is the probability of node i
+        routing to node j for a given target_node.
+        """
+        matrix = np.zeros((self.number_of_nodes, self.number_of_nodes))
+        for i, node in enumerate(self.nodes):
+            matrix[i, :] = node.prob_arr[target_node, :]
+        return matrix
