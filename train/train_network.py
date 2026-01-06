@@ -22,21 +22,21 @@ def create_dataset(number_of_nodes, number_of_observations):
 
 def validation_stats(net, validation_list):
     trajectory_lengths = []
-    total_attenuations = []
+    total_gains = []
     for start_node, target_node in validation_list:
-        visited_nodes, attenuations = net.hops(start_node, target_node)
+        visited_nodes, gains = net.hops(start_node, target_node)
         trajectory_lengths.append(len(visited_nodes))
-        total_attenuations.append(math.prod(attenuations))
+        total_gains.append(math.prod(gains))
     average_length = np.array(trajectory_lengths).mean()
     std_dev_length = np.array(trajectory_lengths).std()
-    return average_length, std_dev_length, np.array(total_attenuations).mean(), np.array(total_attenuations).std()
+    return average_length, std_dev_length, np.array(total_gains).mean(), np.array(total_gains).std()
 
 def main(
     outputDirectory,
     numberOfNodes,
     connectivityAverage,
     connectivityStdDev,
-    attenuationRange,
+    gainRange,
     maximumHops,
     maximumHopsPenalty,
     trainingSize,
@@ -53,7 +53,7 @@ def main(
         number_of_nodes=numberOfNodes,
         connectivity_average=connectivityAverage,
         connectivity_std_dev=connectivityStdDev,
-        attenuation_range=attenuationRange,
+        gain_range=gainRange,
         maximum_hops=maximumHops,
         maximum_hops_penalty=maximumHopsPenalty
     )
@@ -64,40 +64,40 @@ def main(
     validation_list = create_dataset(numberOfNodes, validationSize)
 
     with open(os.path.join(outputDirectory, 'epoch_training.csv'), 'w') as epoch_training_file:
-        epoch_training_file.write("epoch,avg_length,std_length,avg_att,std_att\n")
-        average_length, std_dev_length, average_total_attenuation, std_dev_total_attenuation = validation_stats(net, validation_list)
-        logging.info(f"train_network.main(): Before training (validation): average_length = {average_length}; std_dev_length = {std_dev_length}; average_total_attenuation = {average_total_attenuation}; std_dev_total_attenuation = {std_dev_total_attenuation}")
+        epoch_training_file.write("epoch,avg_length,std_length,avg_gain,std_gain\n")
+        average_length, std_dev_length, average_total_gain, std_dev_total_gain = validation_stats(net, validation_list)
+        logging.info(f"train_network.main(): Before training (validation): average_length = {average_length}; std_dev_length = {std_dev_length}; average_total_gain = {average_total_gain}; std_dev_total_gain = {std_dev_total_gain}")
         epoch_training_file.write(
-            f"0,{average_length},{std_dev_length},{average_total_attenuation},{std_dev_total_attenuation}\n")
+            f"0,{average_length},{std_dev_length},{average_total_gain},{std_dev_total_gain}\n")
         average_lengths = [average_length]
         std_dev_lengths = [std_dev_length]
-        average_total_attenuations = [average_total_attenuation]
-        std_dev_total_attenuations = [std_dev_total_attenuation]
+        average_total_gains = [average_total_gain]
+        std_dev_total_gains = [std_dev_total_gain]
 
 
         for epoch in range(1, numberOfEpochs + 1):
             logging.info(f"***** Epoch {epoch} *****")
             for start_node, target_node in training_list:
-                visited_nodes, attenuations = net.hops(start_node, target_node)
-                net.update_probabilities(visited_nodes, attenuations, target_node)
+                visited_nodes, gains = net.hops(start_node, target_node)
+                net.update_probabilities(visited_nodes, gains, target_node)
 
             # Validation
-            average_length, std_dev_length, average_total_attenuation, std_dev_total_attenuation = validation_stats(net, validation_list)
-            logging.info(f"average_length = {average_length}; std_dev_length = {std_dev_length}; average_total_attenuation = {average_total_attenuation}; std_dev_total_attenuation = {std_dev_total_attenuation}")
+            average_length, std_dev_length, average_total_gain, std_dev_total_gain = validation_stats(net, validation_list)
+            logging.info(f"average_length = {average_length}; std_dev_length = {std_dev_length}; average_total_gain = {average_total_gain}; std_dev_total_gain = {std_dev_total_gain}")
             average_lengths.append(average_length)
             std_dev_lengths.append(std_dev_length)
-            average_total_attenuations.append(average_total_attenuation)
-            std_dev_total_attenuations.append(std_dev_total_attenuation)
-            epoch_training_file.write(f"{epoch},{average_length},{std_dev_length},{average_total_attenuation},{std_dev_total_attenuation}\n")
+            average_total_gains.append(average_total_gain)
+            std_dev_total_gains.append(std_dev_total_gain)
+            epoch_training_file.write(f"{epoch},{average_length},{std_dev_length},{average_total_gain},{std_dev_total_gain}\n")
 
         # Collapse
         net.collapse()
-        average_length, std_dev_length, average_total_attenuation, std_dev_total_attenuation = validation_stats(net,
+        average_length, std_dev_length, average_total_gain, std_dev_total_gain = validation_stats(net,
                                                                                                                   validation_list)
         logging.info(
-            f"After collapse:\naverage_length = {average_length}; std_dev_length = {std_dev_length}; average_total_attenuation = {average_total_attenuation}; std_dev_total_attenuation = {std_dev_total_attenuation}")
+            f"After collapse:\naverage_length = {average_length}; std_dev_length = {std_dev_length}; average_total_gain = {average_total_gain}; std_dev_total_gain = {std_dev_total_gain}")
         epoch_training_file.write(
-            f"{epoch + 1},{average_length},{std_dev_length},{average_total_attenuation},{std_dev_total_attenuation}\n")
+            f"{epoch + 1},{average_length},{std_dev_length},{average_total_gain},{std_dev_total_gain}\n")
     # Save the network
     with open(os.path.join(outputDirectory, 'sparse_network.pkl'), 'wb') as f:
         pickle.dump(net, f)
@@ -108,20 +108,20 @@ if __name__ == '__main__':
     parser.add_argument('--numberOfNodes', help="The number of nodes. Default: 100", type=int, default=100)
     parser.add_argument('--connectivityAverage', help="The approximate connectivity average. Default: 5.0", type=float, default=5.0)
     parser.add_argument('--connectivityStdDev', help="The approximate connectivity standard deviation. Default: 2.0", type=float, default=2.0)
-    parser.add_argument('--attenuationRange', help="The range of attenuation for the links. Default: '[0.8, 1.0]'", default='[0.8, 1.0]')
+    parser.add_argument('--gainRange', help="The range of linear gain for the links. Default: '[0.8, 1.0]'", default='[0.8, 1.0]')
     parser.add_argument('--maximumHops', help="The maximum number of hops. Default: 100", type=int, default=100)
     parser.add_argument('--maximumHopsPenalty', help="The penalty for reaching the maximum number of hops. Default: 0.1", type=float, default=0.1)
     parser.add_argument('--trainingSize', help="The number of training pairs. Default: 10000", type=int, default=10000)
     parser.add_argument('--validationSize', help="The number of validation pairs. Default: 2000", type=int, default=2000)
     parser.add_argument('--numberOfEpochs', help="The number of epochs. Default: 1000", type=int, default=1000)
     args = parser.parse_args()
-    args.attenuationRange = ast.literal_eval(args.attenuationRange)
+    args.gainRange = ast.literal_eval(args.gainRange)
     main(
         args.outputDirectory,
         args.numberOfNodes,
         args.connectivityAverage,
         args.connectivityStdDev,
-        args.attenuationRange,
+        args.gainRange,
         args.maximumHops,
         args.maximumHopsPenalty,
         args.trainingSize,
