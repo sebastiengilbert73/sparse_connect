@@ -110,10 +110,7 @@ def main(
 
             for start_node, target_node in training_list:
                 visited_nodes, costs = graph.trajectory(start_node, target_node, epsilon)
-                #logging.info(f"start_node = {start_node}; target_node = {target_node}\nvisited_nodes = {visited_nodes}\ncosts = {costs}")
-                #logging.info(f"graph.QNodes[start_node].Q = {graph.QNodes[start_node].Q}")
                 graph.update_Q(visited_nodes, costs, alpha, gamma, target_node)
-                #logging.info(f"After graph.update_Q():\ngraph.QNodes[start_node].Q = {graph.QNodes[start_node].Q}")
 
             # Validation
             average_length, std_dev_length, average_total_cost, std_dev_total_cost = \
