@@ -96,7 +96,7 @@ def main(
         std_dev_total_costs = [std_dev_total_cost]
 
         # Initial visualization
-        save_heatmap(graph, target_node=numberOfNodes - 1, epoch=0, output_dir=outputDirectory)
+        save_heatmap(graph, target_node=numberOfNodes - 1, epoch=0, output_dir=viz_dir)
 
         number_of_epochs = schedule.last_epoch()
         for epoch in range(1, number_of_epochs + 1):
@@ -123,6 +123,10 @@ def main(
             std_dev_total_costs.append(std_dev_total_cost)
             epoch_learning_file.write(
                 f"{epoch},{average_length},{std_dev_length},{average_total_cost},{std_dev_total_cost}\n")
+
+            # Save periodic visualizations
+            if epoch % visualizationPeriod == 0 or epoch == number_of_epochs:
+                save_heatmap(graph, target_node=numberOfNodes - 1, epoch=epoch, output_dir=viz_dir)
 
         # With epsilon=0
         average_length, std_dev_length, average_total_cost, std_dev_total_cost = \
