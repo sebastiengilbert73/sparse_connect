@@ -56,15 +56,14 @@ def main(
     trainingSize,
     validationSize,
     schedule,
-    visualizationPeriod
+    visualizationPeriod,
+    nodesFilepath,
+    edgesFilepath
 ):
     logging.info("q_learn.main()")
 
     if not os.path.exists(outputDirectory):
         os.makedirs(outputDirectory)
-
-    # Validation dataset
-    validation_list = create_dataset(numberOfNodes, validationSize)
 
     # Load the schedule
     schedule_df = pd.read_csv(schedule)
@@ -79,6 +78,14 @@ def main(
         maximum_hops=maximumHops,
         maximum_hops_penalty=maximumHopsPenalty
     )
+    if nodesFilepath is not None and edgesFilepath is not None:
+        nodes_df = pd.read_csv(nodesFilepath)
+        edges_df = pd.read_csv(edgesFilepath)
+        graph.load_nodes_edges(nodes_df, edges_df)
+        numberOfNodes = graph.number_of_nodes
+
+    # Validation dataset
+    validation_list = create_dataset(numberOfNodes, validationSize)
 
     viz_dir = os.path.join(outputDirectory, 'visualizations')
     if not os.path.exists(viz_dir):
@@ -163,8 +170,14 @@ if __name__ == '__main__':
     parser.add_argument('--visualizationPeriod',
                         help="The period for epochs where an adjacency matrix is saved. Default: 1", type=int,
                         default=1)
+    parser.add_argument('--nodesFilepath', help="The filepath to the nodes file. Default: 'None'", default='None')
+    parser.add_argument('--edgesFilepath', help="The filepath to the edges csv file. Default: 'None'", default='None')
     args = parser.parse_args()
     args.costRange = ast.literal_eval(args.costRange)
+    if args.nodesFilepath.upper() == 'NONE':
+        args.nodesFilepath = None
+    if args.edgesFilepath.upper() == 'NONE':
+        args.edgesFilepath = None
     main(
         args.outputDirectory,
         args.numberOfNodes,
@@ -176,5 +189,7 @@ if __name__ == '__main__':
         args.trainingSize,
         args.validationSize,
         args.schedule,
-        args.visualizationPeriod
+        args.visualizationPeriod,
+        args.nodesFilepath,
+        args.edgesFilepath
     )
