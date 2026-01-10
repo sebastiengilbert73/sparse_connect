@@ -1,5 +1,6 @@
 import numpy as np
 import random
+import pandas as pd
 
 class QNode:
     def __init__(self, number_of_nodes=0, connectivity_average=0, connectivity_std_dev=0, Q_arr=None, neighbor_nodes=None,
@@ -120,3 +121,25 @@ class QGraph:
             state_dict['QNodes'].append(node.to_dict())
         state_dict['cost_arr'] = self.cost_arr
         return state_dict
+
+    def load_nodes_edges(self, nodes_df, edges_df):
+        id_to_label = nodes_df.set_index("Id")["Label"].to_dict()
+        #print(f"QGraph.load_nodes_edges(): id_to_label =\n{id_to_label}")
+        self.number_of_nodes = len(id_to_label)
+        if set(id_to_label.keys()) != set(range(self.number_of_nodes)):
+            raise ValueError(f"QGraph.load_nodes_edges(): set(id_to_label.keys()) ({set(id_to_label.keys())}) != set(range(self.number_of_nodes)) ({set(range(self.number_of_nodes))}). We expect Id's to be 0, 1, ... N-1")
+
+        edges_df_columns = edges_df.columns
+        if not 'Source' in edges_df_columns or not 'Target' in edges_df_columns or not 'Weight' in edges_df_columns:
+            raise ValueError(f"QGraph.load_nodes_edges(): The columns of the edged DataFrame ({edges_df_columns}) must include 'Source', 'Target', and 'Weight'")
+        src_target_cost_list = list(edges_df[["Source", "Target", "Weight"]].itertuples(index=False, name=None))
+        self.cost_arr = -1 * np.ones((self.number_of_nodes, self.number_of_nodes))
+        self.QNodes = []
+        for node in range(self.number_of_nodes):
+            node_neighbor_cost_list = [(s, t, c) for (s, t, c) in src_target_cost_list if s==node]
+            neighbor_nodes = [t for (s, t, c) in node_neighbor_cost_list]
+            Q = np.zeros((self.number_of_nodes, len(neighbor_nodes)))
+            qnode = QNode(Q_arr=Q, neighbor_nodes=neighbor_nodes)
+            self.QNodes.append(qnode)
+            for _, target_node, cost in node_neighbor_cost_list:
+                self.cost_arr[node, target_node] = cost
