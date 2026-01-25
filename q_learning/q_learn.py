@@ -53,12 +53,14 @@ def main(
     costRange,
     maximumHops,
     maximumHopsPenalty,
+    numberOfUpdatesPerEpoch,
     trainingSize,
     validationSize,
     schedule,
     visualizationPeriod,
     nodesFilepath,
-    edgesFilepath
+    edgesFilepath,
+    validationSet
 ):
     logging.info("q_learn.main()")
 
@@ -85,7 +87,11 @@ def main(
         numberOfNodes = graph.number_of_nodes
 
     # Validation dataset
-    validation_list = create_dataset(numberOfNodes, validationSize)
+    if validationSet is None:
+        validation_list = create_dataset(numberOfNodes, validationSize)
+    else:
+        pairs_df = pd.read_csv(validationSet)
+        validation_list = list(pairs_df.values)
 
     viz_dir = os.path.join(outputDirectory, 'visualizations')
     if not os.path.exists(viz_dir):
@@ -114,14 +120,18 @@ def main(
 
             # Training dataset
             training_list = create_dataset(numberOfNodes, trainingSize)
+            training_list = random.choices(training_list, k=numberOfUpdatesPerEpoch)
 
+            number_of_updates = 0
             for start_node, target_node in training_list:
-                visited_nodes, costs = graph.trajectory(start_node, target_node, epsilon)
-                graph.update_Q(visited_nodes, costs, alpha, gamma, target_node)
-
+                if number_of_updates < numberOfUpdatesPerEpoch:
+                    visited_nodes, costs = graph.trajectory(start_node, target_node, epsilon)
+                    graph.update_Q_from_trajectory(visited_nodes, costs, alpha, gamma, target_node)
+                    number_of_updates += len(visited_nodes)
+            logging.info(f"number_of_updates = {number_of_updates}")
             # Validation
             average_length, std_dev_length, average_total_cost, std_dev_total_cost = \
-                validation_stats(graph, validation_list, epsilon=epsilon)
+                validation_stats(graph, validation_list, epsilon=0)
             logging.info(
                 f"average_length = {average_length}; std_dev_length = {std_dev_length}; average_total_cost = {average_total_cost}; std_dev_total_cost = {std_dev_total_cost}")
             average_lengths.append(average_length)
@@ -162,6 +172,8 @@ if __name__ == '__main__':
     parser.add_argument('--maximumHopsPenalty',
                         help="The penalty for reaching the maximum number of hops. Default: 1.0", type=float,
                         default=1.0)
+    parser.add_argument('--numberOfUpdatesPerEpoch', help="The number of updates per epoch. Default: 1000", type=int,
+                        default=1000)
     parser.add_argument('--trainingSize', help="The number of training pairs. Default: 10000", type=int, default=10000)
     parser.add_argument('--validationSize', help="The number of validation pairs. Default: 2000", type=int,
                         default=2000)
@@ -172,12 +184,15 @@ if __name__ == '__main__':
                         default=1)
     parser.add_argument('--nodesFilepath', help="The filepath to the nodes file. Default: 'None'", default='None')
     parser.add_argument('--edgesFilepath', help="The filepath to the edges csv file. Default: 'None'", default='None')
+    parser.add_argument('--validationSet', help="The filepath to the validation set. Default: 'None'", default='None')
     args = parser.parse_args()
     args.costRange = ast.literal_eval(args.costRange)
     if args.nodesFilepath.upper() == 'NONE':
         args.nodesFilepath = None
     if args.edgesFilepath.upper() == 'NONE':
         args.edgesFilepath = None
+    if args.validationSet.upper() == 'NONE':
+        args.validationSet = None
     main(
         args.outputDirectory,
         args.numberOfNodes,
@@ -186,10 +201,12 @@ if __name__ == '__main__':
         args.costRange,
         args.maximumHops,
         args.maximumHopsPenalty,
+        args.numberOfUpdatesPerEpoch,
         args.trainingSize,
         args.validationSize,
         args.schedule,
         args.visualizationPeriod,
         args.nodesFilepath,
-        args.edgesFilepath
+        args.edgesFilepath,
+        args.validationSet
     )
