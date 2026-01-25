@@ -84,7 +84,7 @@ class QGraph:
         # We reached the maximum number of hops
         return visited_nodes, costs
 
-    def update_Q(self, visited_nodes, costs, alpha, gamma, target_node):
+    def update_Q_from_trajectory(self, visited_nodes, costs, alpha, gamma, target_node):
         if len(visited_nodes) != len(costs) + 1:
             raise ValueError(f"QGraph.update_Q(): len(visited_nodes) ({len(visited_nodes)}) != len(costs) + 1 ({len(costs)} + 1)")
         node_pairs = list(zip(visited_nodes, visited_nodes[1:]))  # [(9, 3), (3, 4), ... (5, 7)]
@@ -99,6 +99,15 @@ class QGraph:
             max_neigh_Q_dest_target_neigh = np.max(self.QNodes[dest_node].Q[target_node, :])
             updated_Q = (1 - alpha) * Q_orig_target_dest + alpha * (reward + gamma * max_neigh_Q_dest_target_neigh)
             self.QNodes[origin_node].Q[target_node, self.QNodes[origin_node].neighbor_column(dest_node)] = updated_Q
+
+    def update_Q(self, start_node, neighbor_node, alpha, gamma, target_node):
+        cost = self.cost_arr[start_node, neighbor_node]
+        reward = -cost
+        # Q_orig(target, dest) <- (1 - alpha) Q_orig(target, dest) + alpha * ( r + gamma * max_neigh' Q_dest(target, neigh') )
+        Q_orig_target_dest = self.QNodes[start_node].Q[target_node, self.QNodes[start_node].neighbor_column(neighbor_node)]
+        max_neigh_Q_dest_target_neigh = np.max(self.QNodes[neighbor_node].Q[target_node, :])
+        updated_Q = (1 - alpha) * Q_orig_target_dest + alpha * (reward + gamma * max_neigh_Q_dest_target_neigh)
+        self.QNodes[start_node].Q[target_node, self.QNodes[start_node].neighbor_column(neighbor_node)] = updated_Q
 
     def get_adjacency_matrix(self, target_node):
         adjacency_mtx = -1 * np.ones((self.number_of_nodes, self.number_of_nodes))
