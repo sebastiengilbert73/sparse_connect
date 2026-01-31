@@ -75,7 +75,7 @@ class QGraph:
         current_node = start_node
         while len(visited_nodes) < self.maximum_hops + 1:
             next_node = self.QNodes[current_node].epsilon_greedy(target_node, epsilon)
-            cost = self.cost_arr[current_node, next_node]
+            cost = float(self.cost_arr[current_node, next_node])
             visited_nodes.append(next_node)
             costs.append(cost)
             current_node = next_node
